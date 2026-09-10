@@ -1,0 +1,15 @@
+web-into-pdf/
+|-- manifest.json
+|-- popup.html
+|-- popup.css
+|-- popup.js
+|-- background.js
+|-- content.js
+|-- icons/
+|   |-- icon16.png
+|   |-- icon48.png
+|   |-- icon128.png
+|-- libs/
+|   |-- html2pdf.bundle.min.js
+|   |-- FileSaver.min.js
+|   |-- jszip.min.js

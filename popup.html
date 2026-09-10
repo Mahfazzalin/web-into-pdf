@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web into PDF & Document Suite Pro</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand-wrapper">
+        <div class="logo-badge" title="Web into PDF Pro">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>Web into PDF <span class="pro-chip">PRO</span></h1>
+          <p>Document & Export Suite</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="themeToggleBtn" class="icon-btn" title="Toggle Dark/Light Mode" aria-label="Toggle theme">
+          <svg id="themeIcon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+        </button>
+        <button id="resetPageBtn" class="icon-btn" title="Reset All Page Modifications" aria-label="Reset page modifications">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Active Tab Metadata Card -->
+    <div class="tab-info-card">
+      <div class="tab-info-main">
+        <img id="tabFavicon" class="tab-favicon" src="icons/icon16.png" alt="favicon" />
+        <span id="tabTitle" class="tab-title">Loading active page...</span>
+        <span id="tabDomain" class="tab-domain-chip">...</span>
+      </div>
+      <div class="tab-meta-chips">
+        <span id="metaSelection" class="meta-chip">✂️ No selection</span>
+        <span class="meta-chip">&bull;</span>
+        <span id="metaImages" class="meta-chip">🖼️ 0 imgs</span>
+        <span class="meta-chip">&bull;</span>
+        <span id="metaTables" class="meta-chip">📊 0 tables</span>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="tab-btn active" data-tab="pdfPanel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+        PDF
+      </button>
+      <button class="tab-btn" data-tab="pageToolsPanel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><line x1="20" y1="4" x2="8.12" y2="15.88"></line><line x1="14.47" y1="14.48" x2="20" y2="20"></line><line x1="8.12" y1="8.12" x2="12" y2="12"></line></svg>
+        Clean
+      </button>
+      <button class="tab-btn" data-tab="convertPanel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+        Convert
+      </button>
+      <button class="tab-btn" data-tab="batchPanel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+        Extract
+      </button>
+    </nav>
+
+    <!-- PANEL 1: PDF Export Tools -->
+    <div id="pdfPanel" class="tab-content active">
+      <!-- Direct PDF Hero Button -->
+      <button id="directPdfBtn" class="hero-btn" title="Download clean PDF instantly without print dialog">
+        <div class="hero-btn-left">
+          <div class="hero-btn-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+          </div>
+          <div class="hero-btn-text">
+            <h3>Direct Clean PDF</h3>
+            <p>One-click instant download file</p>
+          </div>
+        </div>
+        <span class="hero-badge-tag">FAST</span>
+      </button>
+
+      <!-- Secondary PDF Actions -->
+      <div class="action-grid">
+        <div id="nativePrintBtn" class="action-card" title="Open full Chrome print dialog">
+          <div class="action-card-header">
+            <div class="action-card-icon emerald">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                <rect x="6" y="14" width="12" height="8"></rect>
+              </svg>
+            </div>
+            <span class="meta-chip">Ctrl+P</span>
+          </div>
+          <h4>Print Dialog</h4>
+          <p>Standard high-res print</p>
+        </div>
+
+        <div id="readerPdfBtn" class="action-card" title="Generate PDF stripping ads and sidebars">
+          <div class="action-card-header">
+            <div class="action-card-icon cyan">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+              </svg>
+            </div>
+            <span class="meta-chip">No Ads</span>
+          </div>
+          <h4>Reader PDF</h4>
+          <p>Clean article format</p>
+        </div>
+
+        <div id="selectionPdfBtn" class="action-card" title="Generate PDF containing only selected text">
+          <div class="action-card-header">
+            <div class="action-card-icon rose">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="9" y1="9" x2="15" y2="9"></line>
+                <line x1="9" y1="13" x2="15" y2="13"></line>
+                <line x1="9" y1="17" x2="11" y2="17"></line>
+              </svg>
+            </div>
+          </div>
+          <h4>Selection PDF</h4>
+          <p>Export highlighted text</p>
+        </div>
+
+        <div id="copyCitationsBtn" class="action-card" title="Copy clean article citation">
+          <div class="action-card-header">
+            <div class="action-card-icon amber">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </div>
+          </div>
+          <h4>Copy Citation</h4>
+          <p>Web citation format</p>
+        </div>
+      </div>
+
+      <!-- PDF Settings Row -->
+      <div class="settings-box">
+        <div class="settings-box-title">PDF Layout Options</div>
+        <div class="settings-row">
+          <div class="select-control">
+            <label for="pdfPaperSize">Paper</label>
+            <select id="pdfPaperSize">
+              <option value="a4" selected>A4</option>
+              <option value="letter">Letter</option>
+              <option value="legal">Legal</option>
+            </select>
+          </div>
+          <div class="select-control">
+            <label for="pdfOrientation">Orientation</label>
+            <select id="pdfOrientation">
+              <option value="portrait" selected>Portrait</option>
+              <option value="landscape">Landscape</option>
+            </select>
+          </div>
+          <div class="select-control">
+            <label for="pdfMargin">Margin</label>
+            <select id="pdfMargin">
+              <option value="10" selected>Normal</option>
+              <option value="4">Narrow</option>
+              <option value="0">None</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL 2: Page Tools (Clean & Pre-Print Editor) -->
+    <div id="pageToolsPanel" class="tab-content">
+      <!-- Element Eraser Hero Card -->
+      <div id="eraserCard" class="eraser-hero-card">
+        <div class="eraser-header">
+          <div class="eraser-left">
+            <div class="eraser-icon-box">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 20H7L3 16C2 15 2 13 3 12L13 2L22 11L20 20Z"></path>
+                <path d="M17 17L7 7"></path>
+              </svg>
+            </div>
+            <div>
+              <h4 style="font-size:13px;font-weight:700;">Element Eraser</h4>
+              <p style="font-size:10px;color:var(--text-muted);">Hover & click to remove ads/banners</p>
+            </div>
+          </div>
+          <span id="eraserStatus" class="eraser-status-indicator" style="display:none;">
+            <span class="pulsing-dot"></span> Active
+          </span>
+        </div>
+
+        <div class="eraser-footer-actions">
+          <button id="toggleEraserBtn" class="sub-btn primary" style="flex:1;">
+            <span>Toggle Eraser Mode</span>
+          </button>
+          <button id="undoEraserBtn" class="sub-btn" title="Undo deleted element">
+            ↶ Undo
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Page Cleaners -->
+      <div id="toggleReaderCard" class="toggle-card" title="Toggle distraction-free reader view">
+        <div class="toggle-left">
+          <div class="action-card-icon cyan">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+              <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+            </svg>
+          </div>
+          <div class="toggle-titles">
+            <h4>Reader View Mode</h4>
+            <p>Clean book/article reading layout</p>
+          </div>
+        </div>
+        <div class="switch"></div>
+      </div>
+
+      <div id="toggleInkSaverCard" class="toggle-card" title="Convert colors to grayscale for eco printing">
+        <div class="toggle-left">
+          <div class="action-card-icon emerald">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M12 2a10 10 0 0 0 0 20z"></path>
+            </svg>
+          </div>
+          <div class="toggle-titles">
+            <h4>Ink-Saver (Grayscale)</h4>
+            <p>Save printer ink with B&W mode</p>
+          </div>
+        </div>
+        <div class="switch"></div>
+      </div>
+
+      <div id="toggleHideImagesCard" class="toggle-card" title="Hide all images on the page">
+        <div class="toggle-left">
+          <div class="action-card-icon amber">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="1" y1="1" x2="23" y2="23"></line>
+              <path d="M21 21H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3m3-3h6l2 3h4a2 2 0 0 1 2 2v9.34"></path>
+              <circle cx="12" cy="13" r="4"></circle>
+            </svg>
+          </div>
+          <div class="toggle-titles">
+            <h4>Hide All Images</h4>
+            <p>Display text-only content</p>
+          </div>
+        </div>
+        <div class="switch"></div>
+      </div>
+    </div>
+
+    <!-- PANEL 3: Converters -->
+    <div id="convertPanel" class="tab-content">
+      <div class="action-grid">
+        <div id="exportMarkdownBtn" class="action-card" title="Convert web content to clean Markdown (.md)">
+          <div class="action-card-header">
+            <div class="action-card-icon">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+              </svg>
+            </div>
+            <span class="meta-chip">.MD</span>
+          </div>
+          <h4>To Markdown</h4>
+          <p>For Notion, Obsidian & AI</p>
+        </div>
+
+        <div id="exportTextBtn" class="action-card" title="Convert web content to clean plain text (.txt)">
+          <div class="action-card-header">
+            <div class="action-card-icon emerald">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="4 7 4 4 20 4 20 7"></polyline>
+                <line x1="9" y1="20" x2="15" y2="20"></line>
+                <line x1="12" y1="4" x2="12" y2="20"></line>
+              </svg>
+            </div>
+            <span class="meta-chip">.TXT</span>
+          </div>
+          <h4>To Plain Text</h4>
+          <p>Stripped pure text file</p>
+        </div>
+
+        <div id="exportHtmlBtn" class="action-card" title="Export standalone offline readable HTML (.html)">
+          <div class="action-card-header">
+            <div class="action-card-icon cyan">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="16 18 22 12 16 6"></polyline>
+                <polyline points="8 6 2 12 8 18"></polyline>
+              </svg>
+            </div>
+            <span class="meta-chip">.HTML</span>
+          </div>
+          <h4>Offline HTML</h4>
+          <p>Single standalone webpage</p>
+        </div>
+
+        <div id="exportCsvBtn" class="action-card" title="Extract tables to CSV (.csv)">
+          <div class="action-card-header">
+            <div class="action-card-icon amber">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                <line x1="3" y1="9" x2="21" y2="9"></line>
+                <line x1="3" y1="15" x2="21" y2="15"></line>
+                <line x1="9" y1="3" x2="9" y2="21"></line>
+                <line x1="15" y1="3" x2="15" y2="21"></line>
+              </svg>
+            </div>
+            <span class="meta-chip">.CSV</span>
+          </div>
+          <h4>Tables to CSV</h4>
+          <p>Export tables to Excel</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL 4: Batch & Extract -->
+    <div id="batchPanel" class="tab-content">
+      <div class="action-grid">
+        <div id="extractImagesZipBtn" class="action-card" title="Download all webpage images in a single ZIP file">
+          <div class="action-card-header">
+            <div class="action-card-icon rose">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg>
+            </div>
+            <span class="meta-chip">ZIP</span>
+          </div>
+          <h4>Images to ZIP</h4>
+          <p>Download all images archive</p>
+        </div>
+
+        <div id="extractLinksBtn" class="action-card" title="Extract all hyperlinks on the page">
+          <div class="action-card-header">
+            <div class="action-card-icon">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+              </svg>
+            </div>
+            <span class="meta-chip">CSV</span>
+          </div>
+          <h4>Extract Links</h4>
+          <p>Collect all page URLs</p>
+        </div>
+      </div>
+
+      <div id="exportAllTabsBtn" class="toggle-card" title="Export titles & URLs of all open tabs">
+        <div class="toggle-left">
+          <div class="action-card-icon cyan">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+              <polyline points="2 17 12 22 22 17"></polyline>
+              <polyline points="2 12 12 17 22 12"></polyline>
+            </svg>
+          </div>
+          <div class="toggle-titles">
+            <h4>Batch All Open Tabs</h4>
+            <p>Export all window tabs summary (.txt/.md)</p>
+          </div>
+        </div>
+        <button class="sub-btn" style="pointer-events:none;">Batch</button>
+      </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container"></div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>Web into PDF &bull; v2.0</span>
+      <span>100% Offline & Private</span>
+    </footer>
+  </div>
+
+  <script src="libs/FileSaver.min.js"></script>
+  <script src="libs/jszip.min.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

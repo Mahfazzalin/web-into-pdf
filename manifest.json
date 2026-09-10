@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Web into PDF & Document Suite Pro",
+  "version": "2.0.0",
+  "description": "All-in-one web document suite: Export PDF, Markdown, Text, Image ZIP, Table CSV, with live Element Eraser & Reader mode.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "tabs",
+    "storage",
+    "downloads",
+    "contextMenus"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
