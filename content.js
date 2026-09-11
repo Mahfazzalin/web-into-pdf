@@ -748,21 +748,50 @@
   }
 
   // ==========================================
-  // 6. DIRECT CLIENT-SIDE PDF EXPORT
+  // 6. DIRECT CLIENT-SIDE PDF EXPORT (CSP-SAFE)
   // ==========================================
   async function generateDirectPdf(options = {}) {
+    const isSocialOrComplexApp = /facebook\.com|instagram\.com|youtube\.com|twitter\.com|x\.com|tiktok\.com|linkedin\.com/i.test(window.location.hostname);
+
+    // On heavy video/feed SPAs like Facebook/YouTube (especially reels/shorts),
+    // if not in reader mode or selection mode, native print gives 100% fidelity without CSP or canvas tainting issues
+    if (isSocialOrComplexApp && !options.readerMode && !options.selectionOnly) {
+      window.print();
+      return { success: true, fallback: true, message: 'Opened Chrome print dialog for complex web app' };
+    }
+
     if (typeof window.html2pdf === 'undefined') {
-      throw new Error('html2pdf library is not loaded');
+      // Fallback to native print if library unavailable
+      window.print();
+      return { success: true, fallback: true, message: 'Opened Chrome print dialog' };
     }
 
     let targetElement;
     let tempWrapper = null;
+    const taggedElements = [];
+
+    // CRITICAL CSP FIX:
+    // Mark all scripts, preloads, noscripts, iframes, and media with data-html2canvas-ignore="true"
+    // so html2canvas NEVER clones them into its iframe, avoiding CSP violations on Facebook and other sites.
+    try {
+      const noisyTags = document.querySelectorAll('script, noscript, iframe, link[rel*="preload"], link[rel*="prefetch"], link[rel*="modulepreload"], video, audio, object, embed');
+      noisyTags.forEach((el) => {
+        if (!el.hasAttribute('data-html2canvas-ignore')) {
+          el.setAttribute('data-html2canvas-ignore', 'true');
+          taggedElements.push(el);
+        }
+      });
+    } catch (e) {
+      console.warn('Could not tag elements:', e);
+    }
 
     if (options.readerMode) {
       targetElement = extractCleanArticleContent();
       tempWrapper = document.createElement('div');
       tempWrapper.style.padding = '20px';
       tempWrapper.style.fontFamily = 'Arial, sans-serif';
+      tempWrapper.style.background = '#ffffff';
+      tempWrapper.style.color = '#111827';
       tempWrapper.innerHTML = `
         <h1 style="font-size:24px;margin-bottom:8px;">${escapeHTML(document.title)}</h1>
         <p style="color:#666;font-size:12px;margin-bottom:20px;">Source: ${window.location.href}</p>
@@ -776,6 +805,8 @@
       tempWrapper = document.createElement('div');
       tempWrapper.style.padding = '20px';
       tempWrapper.style.fontFamily = 'Arial, sans-serif';
+      tempWrapper.style.background = '#ffffff';
+      tempWrapper.style.color = '#111827';
       tempWrapper.appendChild(sel.getRangeAt(0).cloneContents());
       document.body.appendChild(tempWrapper);
       targetElement = tempWrapper;
@@ -792,17 +823,51 @@
       margin: margin,
       filename: filename,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, logging: false },
+      html2canvas: {
+        scale: 1.5,
+        useCORS: true,
+        logging: false,
+        javascriptEnabled: false, // Prevent script evaluation inside cloned iframe
+        ignoreElements: (el) => {
+          if (!el || !el.tagName) return false;
+          const tag = el.tagName.toUpperCase();
+          if (tag === 'SCRIPT' || tag === 'NOSCRIPT' || tag === 'IFRAME' || tag === 'OBJECT' || tag === 'EMBED' || tag === 'VIDEO' || tag === 'AUDIO') {
+            return true;
+          }
+          if (tag === 'LINK') {
+            const rel = (el.getAttribute('rel') || '').toLowerCase();
+            if (rel.includes('preload') || rel.includes('prefetch') || rel.includes('modulepreload') || rel.includes('prerender')) {
+              return true;
+            }
+          }
+          return false;
+        }
+      },
       jsPDF: { unit: 'mm', format: paperSize, orientation: orientation }
     };
 
     try {
       await window.html2pdf().from(targetElement).set(opt).save();
       return { success: true, filename: filename };
+    } catch (err) {
+      console.warn('html2pdf generation error, triggering native print fallback:', err);
+      // Fallback seamlessly to native print dialog on security/CORS/CSP issues
+      window.print();
+      return {
+        success: true,
+        fallback: true,
+        filename: filename,
+        message: 'Opened Chrome print dialog for optimal quality and security'
+      };
     } finally {
+      // Clean up temporary wrapper if created
       if (tempWrapper && tempWrapper.parentNode) {
         tempWrapper.parentNode.removeChild(tempWrapper);
       }
+      // Remove temporary data-html2canvas-ignore attributes
+      taggedElements.forEach((el) => {
+        el.removeAttribute('data-html2canvas-ignore');
+      });
     }
   }
 

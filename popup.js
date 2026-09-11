@@ -264,7 +264,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         options: fullOpts
       });
 
-      if (res && res.success) {
+      if (res && res.fallback) {
+        showToast('Opened Chrome Print dialog (optimized for complex web apps)', 'success', 4000);
+      } else if (res && res.success) {
         showToast(`PDF saved successfully: ${res.filename}`, 'success');
       } else {
         showToast(`PDF generation failed: ${res?.error || 'Unknown error'}`, 'error');
