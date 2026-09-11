@@ -57,11 +57,25 @@
         const isLive = curSel && !curSel.isCollapsed && curSel.toString().trim().length > 0;
         const hasSelection = isLive || (Boolean(state.lastSelectedText) && state.lastSelectedText.length > 0);
         const effectiveText = isLive ? curSel.toString().trim() : (state.lastSelectedText || '');
+        let effectiveHtml = '';
+        if (isLive && curSel.rangeCount > 0) {
+          try {
+            const d = document.createElement('div');
+            d.appendChild(curSel.getRangeAt(0).cloneContents());
+            effectiveHtml = d.innerHTML;
+          } catch (e) {
+            effectiveHtml = state.lastSelectedHtml || '';
+          }
+        } else {
+          effectiveHtml = state.lastSelectedHtml || '';
+        }
 
         sendResponse({
           title: document.title || 'Webpage',
           url: window.location.href,
           hasSelection: hasSelection,
+          selectedText: effectiveText,
+          selectedHtml: effectiveHtml,
           selectedTextLength: effectiveText.length,
           selectedTextSnippet: effectiveText.substring(0, 100),
           imageCount: document.querySelectorAll('img[src]').length,
@@ -169,7 +183,7 @@
 
       case 'directPdfExport':
         generateDirectPdf(message.options)
-          .then((res) => sendResponse({ success: true, filename: res.filename }))
+          .then((res) => sendResponse({ success: true, filename: res.filename, fallback: res.fallback }))
           .catch((err) => sendResponse({ success: false, error: err.message }));
         return true; // Keep channel open for async response
 
@@ -802,6 +816,101 @@
   // ==========================================
   // 6. DIRECT CLIENT-SIDE PDF EXPORT (CSP-SAFE)
   // ==========================================
+  function makeRelativeUrlsAbsolute(html) {
+    if (!html || typeof html !== 'string') return '';
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const base = window.location.href;
+
+      doc.querySelectorAll('img').forEach((img) => {
+        const src = img.getAttribute('src');
+        if (src && !src.startsWith('data:') && !src.startsWith('blob:')) {
+          try {
+            img.src = new URL(src, base).href;
+          } catch (e) {}
+        }
+        img.style.maxWidth = '100%';
+        img.style.height = 'auto';
+      });
+
+      doc.querySelectorAll('a').forEach((a) => {
+        const href = a.getAttribute('href');
+        if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
+          try {
+            a.href = new URL(href, base).href;
+          } catch (e) {}
+        }
+      });
+
+      return doc.body.innerHTML;
+    } catch (e) {
+      return html;
+    }
+  }
+
+  function printHtmlInIsolatedIframe(htmlContent, title) {
+    try {
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.top = '-9999px';
+      iframe.style.left = '-9999px';
+      iframe.style.width = '100px';
+      iframe.style.height = '100px';
+      iframe.style.border = '0';
+      iframe.id = 'wip-print-frame';
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow.document;
+      doc.open();
+      doc.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="UTF-8">
+            <title>${escapeHTML(title || 'Document')}</title>
+            <style>
+              @page { margin: 15mm; size: auto; }
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                color: #0f172a;
+                background: #ffffff;
+                line-height: 1.6;
+                padding: 0;
+                margin: 0;
+              }
+              img { max-width: 100%; height: auto; }
+              pre, code { font-family: monospace; background: #f1f5f9; }
+              pre { padding: 10px; border-radius: 4px; overflow-x: auto; }
+              blockquote { border-left: 3px solid #6366f1; margin: 0; padding-left: 14px; color: #475569; }
+            </style>
+          </head>
+          <body>
+            ${htmlContent}
+          </body>
+        </html>
+      `);
+      doc.close();
+
+      setTimeout(() => {
+        try {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+        } catch (e) {
+          console.warn('Iframe print error:', e);
+          window.print();
+        } finally {
+          setTimeout(() => {
+            if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+          }, 3000);
+        }
+      }, 300);
+    } catch (e) {
+      console.warn('Fallback print iframe failed:', e);
+      window.print();
+    }
+  }
+
   async function generateDirectPdf(options = {}) {
     const isSocialOrComplexApp = /facebook\.com|instagram\.com|youtube\.com|twitter\.com|x\.com|tiktok\.com|linkedin\.com/i.test(window.location.hostname);
 
@@ -812,19 +921,147 @@
       return { success: true, fallback: true, message: 'Opened Chrome print dialog for complex web app' };
     }
 
-    if (typeof window.html2pdf === 'undefined') {
-      // Fallback to native print if library unavailable
-      window.print();
-      return { success: true, fallback: true, message: 'Opened Chrome print dialog' };
+    let pdfSource = null;
+    let fallbackHtml = null;
+    const cleanTitle = escapeHTML(document.title || 'Selected Content');
+    const pageUrl = escapeHTML(window.location.href);
+    const dateStr = new Date().toLocaleString();
+
+    if (options.selectionOnly) {
+      updateStoredSelection();
+      let selHtml = '';
+      let selText = options.selectedText || '';
+
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
+        try {
+          const div = document.createElement('div');
+          div.appendChild(sel.getRangeAt(0).cloneContents());
+          selHtml = div.innerHTML;
+          if (!selText) selText = sel.toString().trim();
+        } catch (e) {
+          selHtml = '';
+        }
+      }
+
+      if (!selHtml && options.selectedHtml) {
+        selHtml = options.selectedHtml;
+      }
+      if (!selHtml && state.lastSelectedHtml) {
+        selHtml = state.lastSelectedHtml;
+      }
+      if (!selHtml && selText) {
+        selHtml = `<p>${escapeHTML(selText).replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>')}</p>`;
+      }
+      if (!selHtml && state.lastSelectedText) {
+        selHtml = `<p>${escapeHTML(state.lastSelectedText).replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>')}</p>`;
+      }
+
+      if (!selHtml || selHtml.trim().length === 0) {
+        throw new Error('No text is currently selected on the page. Please highlight text first.');
+      }
+
+      const resolvedSelHtml = makeRelativeUrlsAbsolute(selHtml);
+
+      const selectionDocHtml = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0f172a; background: #ffffff; padding: 24px; box-sizing: border-box; width: 100%;">
+          <style>
+            .wip-sel-body { font-size: 14px; line-height: 1.7; color: #1e293b; word-wrap: break-word; }
+            .wip-sel-body p { margin-top: 0; margin-bottom: 1em; }
+            .wip-sel-body h1, .wip-sel-body h2, .wip-sel-body h3, .wip-sel-body h4 { color: #0f172a; margin-top: 1.2em; margin-bottom: 0.5em; line-height: 1.3; }
+            .wip-sel-body blockquote { border-left: 3px solid #6366f1; margin: 1em 0; padding-left: 14px; color: #475569; font-style: italic; }
+            .wip-sel-body pre, .wip-sel-body code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background: #f1f5f9; }
+            .wip-sel-body pre { padding: 12px; border-radius: 6px; overflow-x: auto; margin: 1em 0; }
+            .wip-sel-body img { max-width: 100% !important; height: auto !important; border-radius: 6px; margin: 10px 0; }
+            .wip-sel-body table { width: 100%; border-collapse: collapse; margin: 1em 0; }
+            .wip-sel-body th, .wip-sel-body td { border: 1px solid #e2e8f0; padding: 8px 12px; text-align: left; }
+            .wip-sel-body th { background-color: #f8fafc; font-weight: 600; }
+            .wip-sel-body ul, .wip-sel-body ol { padding-left: 24px; margin: 1em 0; }
+            .wip-sel-body li { margin-bottom: 0.3em; }
+          </style>
+          <div style="border-bottom: 2px solid #6366f1; padding-bottom: 14px; margin-bottom: 20px;">
+            <div style="display: inline-block; background: #eef2ff; color: #4f46e5; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+              Selection Document
+            </div>
+            <h1 style="font-size: 20px; font-weight: 700; color: #0f172a; margin: 0 0 6px 0; line-height: 1.3;">
+              ${cleanTitle}
+            </h1>
+            <div style="font-size: 11px; color: #64748b; line-height: 1.4; word-break: break-all;">
+              <div><strong>Source:</strong> <a href="${pageUrl}" style="color: #6366f1; text-decoration: none;">${pageUrl}</a></div>
+              <div><strong>Captured:</strong> ${dateStr} &bull; <strong>Format:</strong> Selection PDF</div>
+            </div>
+          </div>
+          <div class="wip-sel-body">
+            ${resolvedSelHtml}
+          </div>
+          <div style="margin-top: 32px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #94a3b8; display: flex; justify-content: space-between;">
+            <span>Web into PDF Pro &bull; Selection Document</span>
+            <span>100% Client-side Offline</span>
+          </div>
+        </div>
+      `;
+
+      pdfSource = selectionDocHtml;
+      fallbackHtml = selectionDocHtml;
+    } else if (options.readerMode) {
+      const cleanContent = extractCleanArticleContent();
+      const resolvedReaderHtml = makeRelativeUrlsAbsolute(cleanContent.innerHTML);
+
+      const readerDocHtml = `
+        <div style="font-family: Georgia, Cambria, 'Times New Roman', serif; color: #1e293b; background: #ffffff; padding: 24px; box-sizing: border-box; width: 100%; line-height: 1.8;">
+          <style>
+            .wip-reader-pdf-body { font-size: 15px; color: #1e293b; line-height: 1.8; word-wrap: break-word; }
+            .wip-reader-pdf-body p { margin-top: 0; margin-bottom: 1.4em; }
+            .wip-reader-pdf-body h1, .wip-reader-pdf-body h2, .wip-reader-pdf-body h3 { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #0f172a; margin-top: 1.6em; margin-bottom: 0.6em; }
+            .wip-reader-pdf-body img { max-width: 100% !important; height: auto !important; border-radius: 6px; margin: 16px auto; display: block; }
+            .wip-reader-pdf-body blockquote { border-left: 3px solid #cbd5e1; margin: 1.2em 0; padding-left: 16px; color: #475569; font-style: italic; }
+            .wip-reader-pdf-body table { width: 100%; border-collapse: collapse; margin: 1.2em 0; }
+            .wip-reader-pdf-body th, .wip-reader-pdf-body td { border: 1px solid #e2e8f0; padding: 8px 12px; font-family: sans-serif; font-size: 13px; }
+          </style>
+          <div style="border-bottom: 2px solid #0f172a; padding-bottom: 14px; margin-bottom: 20px;">
+            <div style="display: inline-block; background: #f1f5f9; color: #334155; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; font-family: sans-serif;">
+              Reader Mode Document
+            </div>
+            <h1 style="font-size: 22px; font-weight: 700; color: #0f172a; margin: 0 0 6px 0; line-height: 1.3;">
+              ${cleanTitle}
+            </h1>
+            <div style="font-size: 11px; color: #64748b; line-height: 1.4; word-break: break-all; font-family: sans-serif;">
+              <div><strong>Source:</strong> <a href="${pageUrl}" style="color: #2563eb; text-decoration: none;">${pageUrl}</a></div>
+              <div><strong>Captured:</strong> ${dateStr} &bull; <strong>Format:</strong> Clean Reader PDF</div>
+            </div>
+          </div>
+          <div class="wip-reader-pdf-body">
+            ${resolvedReaderHtml}
+          </div>
+          <div style="margin-top: 32px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #94a3b8; display: flex; justify-content: space-between; font-family: sans-serif;">
+            <span>Web into PDF Pro &bull; Clean Reader Document</span>
+            <span>100% Client-side Offline</span>
+          </div>
+        </div>
+      `;
+
+      pdfSource = readerDocHtml;
+      fallbackHtml = readerDocHtml;
+    } else {
+      pdfSource = document.body;
+      fallbackHtml = null;
     }
 
-    let targetElement;
-    let tempWrapper = null;
-    const taggedElements = [];
+    const filename = sanitizeFilename(options.filename || (options.selectionOnly ? `Selection_${document.title}` : document.title)) + '.pdf';
+    const paperSize = options.paperSize || 'a4';
+    const orientation = options.orientation || 'portrait';
+    const margin = options.margin !== undefined ? options.margin : 10;
 
-    // CRITICAL CSP FIX:
-    // Mark all scripts, preloads, noscripts, iframes, and media with data-html2canvas-ignore="true"
-    // so html2canvas NEVER clones them into its iframe, avoiding CSP violations on Facebook and other sites.
+    if (typeof window.html2pdf === 'undefined') {
+      if (fallbackHtml) {
+        printHtmlInIsolatedIframe(fallbackHtml, filename);
+        return { success: true, fallback: true, filename: filename, message: 'Printed document via print dialog' };
+      }
+      window.print();
+      return { success: true, fallback: true, filename: filename, message: 'Opened Chrome print dialog' };
+    }
+
+    const taggedElements = [];
     try {
       const noisyTags = document.querySelectorAll('script, noscript, iframe, link[rel*="preload"], link[rel*="prefetch"], link[rel*="modulepreload"], video, audio, object, embed');
       noisyTags.forEach((el) => {
@@ -837,131 +1074,21 @@
       console.warn('Could not tag elements:', e);
     }
 
-    if (options.readerMode) {
-      targetElement = extractCleanArticleContent();
-      tempWrapper = document.createElement('div');
-      tempWrapper.style.padding = '20px';
-      tempWrapper.style.fontFamily = 'Arial, sans-serif';
-      tempWrapper.style.background = '#ffffff';
-      tempWrapper.style.color = '#111827';
-      tempWrapper.innerHTML = `
-        <h1 style="font-size:24px;margin-bottom:8px;">${escapeHTML(document.title)}</h1>
-        <p style="color:#666;font-size:12px;margin-bottom:20px;">Source: ${window.location.href}</p>
-      `;
-      tempWrapper.appendChild(targetElement);
-      document.body.appendChild(tempWrapper);
-      targetElement = tempWrapper;
-    } else if (options.selectionOnly) {
-      updateStoredSelection();
-      let selHtml = '';
-      const sel = window.getSelection();
-
-      if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
-        try {
-          const div = document.createElement('div');
-          div.appendChild(sel.getRangeAt(0).cloneContents());
-          selHtml = div.innerHTML;
-        } catch (e) {
-          selHtml = '';
-        }
-      }
-
-      if (!selHtml && state.lastSelectedHtml) {
-        selHtml = state.lastSelectedHtml;
-      }
-
-      if (!selHtml && options.selectedText) {
-        selHtml = `<p>${escapeHTML(options.selectedText).replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>')}</p>`;
-      }
-
-      if (!selHtml && state.lastSelectedText) {
-        selHtml = `<p>${escapeHTML(state.lastSelectedText).replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>')}</p>`;
-      }
-
-      if (!selHtml || selHtml.trim().length === 0) {
-        throw new Error('No text is currently selected on the page. Please highlight text first.');
-      }
-
-      tempWrapper = document.createElement('div');
-      tempWrapper.id = 'wip-selection-render-container';
-      tempWrapper.style.cssText = `
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        width: 100% !important;
-        max-width: 800px !important;
-        min-height: 100vh !important;
-        background: #ffffff !important;
-        color: #0f172a !important;
-        padding: 40px 50px !important;
-        box-sizing: border-box !important;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-        font-size: 15px !important;
-        line-height: 1.6 !important;
-        z-index: 2147483647 !important;
-        box-shadow: none !important;
-        overflow: visible !important;
-      `;
-
-      tempWrapper.innerHTML = `
-        <div style="border-bottom: 2px solid #6366f1; padding-bottom: 14px; margin-bottom: 24px;">
-          <h1 style="font-size: 22px; font-weight: 700; color: #0f172a; margin: 0 0 6px 0; line-height: 1.3;">
-            ${escapeHTML(document.title || 'Selected Content')}
-          </h1>
-          <div style="font-size: 11px; color: #64748b; line-height: 1.5; word-break: break-all;">
-            <div><strong>Source:</strong> <a href="${escapeHTML(window.location.href)}" style="color: #6366f1; text-decoration: none;">${escapeHTML(window.location.href)}</a></div>
-            <div><strong>Captured:</strong> ${new Date().toLocaleString()} &bull; <strong>Format:</strong> Selection PDF</div>
-          </div>
-        </div>
-        <div class="wip-selection-body" style="font-size: 14px; color: #1e293b; line-height: 1.7;">
-          ${selHtml}
-        </div>
-        <div style="margin-top: 36px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #94a3b8; display: flex; justify-content: space-between;">
-          <span>Web into PDF &bull; Selection Document</span>
-          <span>100% Client-side Offline</span>
-        </div>
-      `;
-
-      // Inject @media print style to isolate selection container if native print is invoked
-      const printStyle = document.createElement('style');
-      printStyle.id = 'wip-selection-print-style';
-      printStyle.textContent = `
-        @media print {
-          body > *:not(#wip-selection-render-container) {
-            display: none !important;
-          }
-          #wip-selection-render-container {
-            position: static !important;
-            width: 100% !important;
-            max-width: none !important;
-            padding: 20px !important;
-            margin: 0 !important;
-            display: block !important;
-            min-height: auto !important;
-          }
-        }
-      `;
-      document.head.appendChild(printStyle);
-      document.body.appendChild(tempWrapper);
-      targetElement = tempWrapper;
-    } else {
-      targetElement = document.body;
-    }
-
-    const filename = sanitizeFilename(options.filename || (options.selectionOnly ? `Selection_${document.title}` : document.title)) + '.pdf';
-    const paperSize = options.paperSize || 'a4';
-    const orientation = options.orientation || 'portrait';
-    const margin = options.margin !== undefined ? options.margin : 10;
-
     const opt = {
       margin: margin,
       filename: filename,
       image: { type: 'jpeg', quality: 0.98 },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
       html2canvas: {
-        scale: 1.5,
+        scale: 2,
+        scrollY: 0,
+        scrollX: 0,
+        windowWidth: 1024,
         useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
         logging: false,
-        javascriptEnabled: false, // Prevent script evaluation inside cloned iframe
+        javascriptEnabled: false,
         ignoreElements: (el) => {
           if (!el || !el.tagName) return false;
           const tag = el.tagName.toUpperCase();
@@ -981,27 +1108,27 @@
     };
 
     try {
-      await window.html2pdf().from(targetElement).set(opt).save();
+      await window.html2pdf().from(pdfSource).set(opt).save();
       return { success: true, filename: filename };
     } catch (err) {
-      console.warn('html2pdf generation error, triggering native print fallback:', err);
-      // Fallback seamlessly to native print dialog on security/CORS/CSP issues
+      console.warn('html2pdf generation error, using safe fallback:', err);
+      if (fallbackHtml) {
+        printHtmlInIsolatedIframe(fallbackHtml, filename);
+        return {
+          success: true,
+          fallback: true,
+          filename: filename,
+          message: 'Opened isolated print dialog for selected content'
+        };
+      }
       window.print();
       return {
         success: true,
         fallback: true,
         filename: filename,
-        message: 'Opened Chrome print dialog for optimal quality and security'
+        message: 'Opened Chrome print dialog for optimal quality'
       };
     } finally {
-      // Clean up temporary wrapper if created
-      if (tempWrapper && tempWrapper.parentNode) {
-        tempWrapper.parentNode.removeChild(tempWrapper);
-      }
-      const pStyle = document.getElementById('wip-selection-print-style');
-      if (pStyle) pStyle.remove();
-
-      // Remove temporary data-html2canvas-ignore attributes
       taggedElements.forEach((el) => {
         el.removeAttribute('data-html2canvas-ignore');
       });

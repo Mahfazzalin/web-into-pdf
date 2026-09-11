@@ -231,6 +231,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     await runDirectPdf({
       readerMode: false,
       selectionOnly: true,
+      selectedText: stats.selectedText || '',
+      selectedHtml: stats.selectedHtml || '',
       filename: `Selection_${cleanTitle}`
     });
   });
