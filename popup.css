@@ -748,3 +748,169 @@ body {
 .footer a:hover {
   color: #818cf8;
 }
+
+/* =========================================================
+   Monthly Review Reminder Banner
+   ========================================================= */
+.review-banner {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.92) 0%, rgba(20, 27, 45, 0.96) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.12), var(--shadow-sm);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  animation: reviewSlideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+body.light-theme .review-banner {
+  background: linear-gradient(135deg, #fffdf5 0%, #fef3c7 100%);
+  border-color: rgba(245, 158, 11, 0.45);
+  box-shadow: 0 4px 18px rgba(245, 158, 11, 0.15);
+}
+
+@keyframes reviewSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.review-banner-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.review-stars-badge {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.review-stars-badge .star-icon {
+  color: #f59e0b;
+  font-size: 13px;
+  filter: drop-shadow(0 0 3px rgba(245, 158, 11, 0.4));
+}
+
+.review-badge-text {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.14);
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+  margin-left: 5px;
+}
+
+.review-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.review-close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.review-banner-content h4 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 3px;
+}
+
+.review-banner-content p {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.review-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.review-rate-btn {
+  flex: 1.2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(245, 158, 11, 0.35);
+  transition: var(--transition);
+}
+
+.review-rate-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.45);
+  filter: brightness(1.05);
+}
+
+.review-later-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.review-later-btn:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+/* Footer Review Link */
+.footer-rate-link {
+  color: #f59e0b !important;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 600;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.footer-rate-link:hover {
+  color: #fbbf24 !important;
+  text-decoration: underline !important;
+}

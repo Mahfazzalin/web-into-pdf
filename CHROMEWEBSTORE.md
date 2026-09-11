@@ -283,11 +283,10 @@ Compress-Archive -Path manifest.json, popup.html, popup.css, popup.js, backgroun
 - [x] No remote scripts or external CDNs loaded at runtime.
 - [x] All 6 permissions have clear, honest, feature-based justifications.
 - [x] Detailed description does not make misleading or prohibited claims.
-- [x] Icons exist and match manifest paths.
-- [ ] Icons resized to exact dimensions (16x16, 48x48, 128x128).
+- [x] Icons exist, modernized, and resized to exact dimensions (16x16, 48x48, 128x128).
+- [x] Clean ZIP archive created without git/dev files (`WebIntoPdf_v2.0.0.zip`).
 - [ ] At least one 1280x800 screenshot captured.
 - [ ] Privacy Policy hosted on public URL (GitHub Pages / Gist).
-- [ ] Clean ZIP archive created without git/dev files.
 
 ---
 
@@ -295,5 +294,5 @@ Compress-Archive -Path manifest.json, popup.html, popup.css, popup.js, backgroun
 
 | Version | Date | Changes Summary | Store Status |
 | :--- | :--- | :--- | :--- |
-| 2.0.0 | 2026-09-12 | Complete Manifest V3 Document Suite: Direct PDF, Element Eraser, Reader mode, Markdown, CSV, Images ZIP, and Open Tabs batch exporter. | Draft / Ready for Submission |
+| 2.0.0 | 2026-09-12 | Complete Manifest V3 Document Suite: Direct PDF, Element Eraser, Reader mode, Markdown, CSV, Images ZIP, Open Tabs batch exporter, brand new 3D modern icon suite, and monthly user review reminder system. | Ready for Submission |
 | 1.0.0 | Earlier | Initial Web into PDF release. | Archived |

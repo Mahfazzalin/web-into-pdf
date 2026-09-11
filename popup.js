@@ -568,4 +568,120 @@ document.addEventListener('DOMContentLoaded', async () => {
       el.style.pointerEvents = 'none';
     });
   }
+
+  // ------------------------------------
+  // Monthly Review Reminder System
+  // ------------------------------------
+  const reviewBanner = document.getElementById('reviewBanner');
+  const rateReviewBtn = document.getElementById('rateReviewBtn');
+  const laterReviewBtn = document.getElementById('laterReviewBtn');
+  const dismissReviewBtn = document.getElementById('dismissReviewBtn');
+  const footerRateLink = document.getElementById('footerRateLink');
+
+  const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000; // 30 days in ms
+
+  function initReviewPromptSystem() {
+    storageGet(['reviewGiven', 'lastReviewPromptTime', 'firstInstallTime'], (res) => {
+      const now = Date.now();
+
+      // First run: save install time and initialize prompt timer
+      if (!res.firstInstallTime) {
+        storageSet({
+          firstInstallTime: now,
+          lastReviewPromptTime: now
+        });
+        return;
+      }
+
+      // If user already reviewed, keep banner hidden
+      if (res.reviewGiven) {
+        return;
+      }
+
+      // Check if 30 days or more have elapsed since install or last prompt
+      const lastPrompt = res.lastReviewPromptTime || res.firstInstallTime;
+      if (now - lastPrompt >= THIRTY_DAYS_MS) {
+        if (reviewBanner) {
+          reviewBanner.style.display = 'flex';
+        }
+      }
+    });
+  }
+
+  function openChromeStoreReview() {
+    const extId = (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id)
+      ? chrome.runtime.id
+      : '';
+    const reviewUrl = extId
+      ? `https://chromewebstore.google.com/detail/${extId}/reviews`
+      : 'https://chromewebstore.google.com/';
+
+    if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.create) {
+      chrome.tabs.create({ url: reviewUrl });
+    } else {
+      window.open(reviewUrl, '_blank');
+    }
+  }
+
+  function hideReviewBannerWithAnimation() {
+    if (!reviewBanner) return;
+    reviewBanner.style.opacity = '0';
+    reviewBanner.style.transform = 'translateY(-8px) scale(0.98)';
+    setTimeout(() => {
+      reviewBanner.style.display = 'none';
+    }, 250);
+  }
+
+  if (rateReviewBtn) {
+    rateReviewBtn.addEventListener('click', () => {
+      openChromeStoreReview();
+      storageSet({
+        reviewGiven: true,
+        lastReviewPromptTime: Date.now()
+      });
+      hideReviewBannerWithAnimation();
+      showToast('Thank you so much for supporting Web into PDF Pro! ❤️', 'success', 4000);
+    });
+  }
+
+  function postponeReviewPrompt() {
+    storageSet({
+      lastReviewPromptTime: Date.now()
+    });
+    hideReviewBannerWithAnimation();
+    showToast('Reminder postponed for 30 days. Thank you!', 'info', 3000);
+  }
+
+  if (laterReviewBtn) {
+    laterReviewBtn.addEventListener('click', postponeReviewPrompt);
+  }
+
+  if (dismissReviewBtn) {
+    dismissReviewBtn.addEventListener('click', postponeReviewPrompt);
+  }
+
+  if (footerRateLink) {
+    footerRateLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      openChromeStoreReview();
+      storageSet({
+        reviewGiven: true,
+        lastReviewPromptTime: Date.now()
+      });
+      hideReviewBannerWithAnimation();
+      showToast('Opening Chrome Web Store review page...', 'info', 3000);
+    });
+  }
+
+  // Developer / debug helper to test banner rendering in console
+  window.__testReviewReminder = () => {
+    if (reviewBanner) {
+      reviewBanner.style.display = 'flex';
+      reviewBanner.style.opacity = '1';
+      reviewBanner.style.transform = 'translateY(0) scale(1)';
+    }
+  };
+
+  // Run review check on popup initialization
+  initReviewPromptSystem();
 });
