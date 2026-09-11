@@ -15,8 +15,34 @@
     inkSaverActive: false,
     hideImagesActive: false,
     readerModeActive: false,
-    originalBodyContent: null
+    originalBodyContent: null,
+    lastSelectedText: '',
+    lastSelectedHtml: ''
   };
+
+  // Real-time Selection Tracking (captures selection before popup blur)
+  function updateStoredSelection() {
+    try {
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
+        const text = sel.toString().trim();
+        if (text.length > 0) {
+          state.lastSelectedText = text;
+          const range = sel.getRangeAt(0);
+          const div = document.createElement('div');
+          div.appendChild(range.cloneContents());
+          state.lastSelectedHtml = div.innerHTML;
+        }
+      }
+    } catch (e) {
+      // Ignore cross-origin frame or range exceptions
+    }
+  }
+
+  document.addEventListener('selectionchange', updateStoredSelection, true);
+  document.addEventListener('mouseup', updateStoredSelection, true);
+  document.addEventListener('keyup', updateStoredSelection, true);
+  document.addEventListener('contextmenu', updateStoredSelection, true);
 
   // Listen for messages from popup or background
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -26,11 +52,18 @@
         break;
 
       case 'getPageDetails':
+        updateStoredSelection();
+        const curSel = window.getSelection();
+        const isLive = curSel && !curSel.isCollapsed && curSel.toString().trim().length > 0;
+        const hasSelection = isLive || (Boolean(state.lastSelectedText) && state.lastSelectedText.length > 0);
+        const effectiveText = isLive ? curSel.toString().trim() : (state.lastSelectedText || '');
+
         sendResponse({
           title: document.title || 'Webpage',
           url: window.location.href,
-          hasSelection: !window.getSelection().isCollapsed && window.getSelection().toString().trim().length > 0,
-          selectedTextLength: window.getSelection().toString().trim().length,
+          hasSelection: hasSelection,
+          selectedTextLength: effectiveText.length,
+          selectedTextSnippet: effectiveText.substring(0, 100),
           imageCount: document.querySelectorAll('img[src]').length,
           tableCount: document.querySelectorAll('table').length,
           inkSaverActive: state.inkSaverActive,
@@ -556,11 +589,19 @@
     let sourceNode;
     const sel = window.getSelection();
 
-    if (selectionOnly && !sel.isCollapsed) {
-      const range = sel.getRangeAt(0);
-      const div = document.createElement('div');
-      div.appendChild(range.cloneContents());
-      sourceNode = div;
+    if (selectionOnly) {
+      if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        const div = document.createElement('div');
+        div.appendChild(range.cloneContents());
+        sourceNode = div;
+      } else if (state.lastSelectedHtml) {
+        const div = document.createElement('div');
+        div.innerHTML = state.lastSelectedHtml;
+        sourceNode = div;
+      } else {
+        sourceNode = extractCleanArticleContent();
+      }
     } else {
       sourceNode = extractCleanArticleContent();
     }
@@ -630,8 +671,13 @@
 
   function getPageCleanText(selectionOnly) {
     const sel = window.getSelection();
-    if (selectionOnly && !sel.isCollapsed) {
-      return sel.toString().trim();
+    if (selectionOnly) {
+      if (sel && !sel.isCollapsed) {
+        return sel.toString().trim();
+      }
+      if (state.lastSelectedText) {
+        return state.lastSelectedText;
+      }
     }
     const cleanArticle = extractCleanArticleContent();
     return cleanArticle.innerText.replace(/\n{3,}/g, '\n\n').trim();
@@ -641,11 +687,17 @@
     let contentHtml = '';
     const sel = window.getSelection();
 
-    if (selectionOnly && !sel.isCollapsed) {
-      const range = sel.getRangeAt(0);
-      const div = document.createElement('div');
-      div.appendChild(range.cloneContents());
-      contentHtml = div.innerHTML;
+    if (selectionOnly) {
+      if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        const div = document.createElement('div');
+        div.appendChild(range.cloneContents());
+        contentHtml = div.innerHTML;
+      } else if (state.lastSelectedHtml) {
+        contentHtml = state.lastSelectedHtml;
+      } else {
+        contentHtml = extractCleanArticleContent().innerHTML;
+      }
     } else {
       contentHtml = extractCleanArticleContent().innerHTML;
     }
@@ -800,21 +852,103 @@
       document.body.appendChild(tempWrapper);
       targetElement = tempWrapper;
     } else if (options.selectionOnly) {
+      updateStoredSelection();
+      let selHtml = '';
       const sel = window.getSelection();
-      if (sel.isCollapsed) throw new Error('No text is currently selected on the page');
+
+      if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
+        try {
+          const div = document.createElement('div');
+          div.appendChild(sel.getRangeAt(0).cloneContents());
+          selHtml = div.innerHTML;
+        } catch (e) {
+          selHtml = '';
+        }
+      }
+
+      if (!selHtml && state.lastSelectedHtml) {
+        selHtml = state.lastSelectedHtml;
+      }
+
+      if (!selHtml && options.selectedText) {
+        selHtml = `<p>${escapeHTML(options.selectedText).replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>')}</p>`;
+      }
+
+      if (!selHtml && state.lastSelectedText) {
+        selHtml = `<p>${escapeHTML(state.lastSelectedText).replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>')}</p>`;
+      }
+
+      if (!selHtml || selHtml.trim().length === 0) {
+        throw new Error('No text is currently selected on the page. Please highlight text first.');
+      }
+
       tempWrapper = document.createElement('div');
-      tempWrapper.style.padding = '20px';
-      tempWrapper.style.fontFamily = 'Arial, sans-serif';
-      tempWrapper.style.background = '#ffffff';
-      tempWrapper.style.color = '#111827';
-      tempWrapper.appendChild(sel.getRangeAt(0).cloneContents());
+      tempWrapper.id = 'wip-selection-render-container';
+      tempWrapper.style.cssText = `
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        max-width: 800px !important;
+        min-height: 100vh !important;
+        background: #ffffff !important;
+        color: #0f172a !important;
+        padding: 40px 50px !important;
+        box-sizing: border-box !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+        font-size: 15px !important;
+        line-height: 1.6 !important;
+        z-index: 2147483647 !important;
+        box-shadow: none !important;
+        overflow: visible !important;
+      `;
+
+      tempWrapper.innerHTML = `
+        <div style="border-bottom: 2px solid #6366f1; padding-bottom: 14px; margin-bottom: 24px;">
+          <h1 style="font-size: 22px; font-weight: 700; color: #0f172a; margin: 0 0 6px 0; line-height: 1.3;">
+            ${escapeHTML(document.title || 'Selected Content')}
+          </h1>
+          <div style="font-size: 11px; color: #64748b; line-height: 1.5; word-break: break-all;">
+            <div><strong>Source:</strong> <a href="${escapeHTML(window.location.href)}" style="color: #6366f1; text-decoration: none;">${escapeHTML(window.location.href)}</a></div>
+            <div><strong>Captured:</strong> ${new Date().toLocaleString()} &bull; <strong>Format:</strong> Selection PDF</div>
+          </div>
+        </div>
+        <div class="wip-selection-body" style="font-size: 14px; color: #1e293b; line-height: 1.7;">
+          ${selHtml}
+        </div>
+        <div style="margin-top: 36px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #94a3b8; display: flex; justify-content: space-between;">
+          <span>Web into PDF &bull; Selection Document</span>
+          <span>100% Client-side Offline</span>
+        </div>
+      `;
+
+      // Inject @media print style to isolate selection container if native print is invoked
+      const printStyle = document.createElement('style');
+      printStyle.id = 'wip-selection-print-style';
+      printStyle.textContent = `
+        @media print {
+          body > *:not(#wip-selection-render-container) {
+            display: none !important;
+          }
+          #wip-selection-render-container {
+            position: static !important;
+            width: 100% !important;
+            max-width: none !important;
+            padding: 20px !important;
+            margin: 0 !important;
+            display: block !important;
+            min-height: auto !important;
+          }
+        }
+      `;
+      document.head.appendChild(printStyle);
       document.body.appendChild(tempWrapper);
       targetElement = tempWrapper;
     } else {
       targetElement = document.body;
     }
 
-    const filename = sanitizeFilename(options.filename || document.title) + '.pdf';
+    const filename = sanitizeFilename(options.filename || (options.selectionOnly ? `Selection_${document.title}` : document.title)) + '.pdf';
     const paperSize = options.paperSize || 'a4';
     const orientation = options.orientation || 'portrait';
     const margin = options.margin !== undefined ? options.margin : 10;
@@ -864,6 +998,9 @@
       if (tempWrapper && tempWrapper.parentNode) {
         tempWrapper.parentNode.removeChild(tempWrapper);
       }
+      const pStyle = document.getElementById('wip-selection-print-style');
+      if (pStyle) pStyle.remove();
+
       // Remove temporary data-html2canvas-ignore attributes
       taggedElements.forEach((el) => {
         el.removeAttribute('data-html2canvas-ignore');

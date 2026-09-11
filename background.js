@@ -49,7 +49,12 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       });
       await chrome.tabs.sendMessage(tab.id, {
         action: 'directPdfExport',
-        options: { selectionOnly: true, paperSize: 'a4', orientation: 'portrait' }
+        options: {
+          selectionOnly: true,
+          paperSize: 'a4',
+          orientation: 'portrait',
+          selectedText: info.selectionText || ''
+        }
       });
     } else if (info.menuItemId === 'wip-save-markdown') {
       const response = await chrome.tabs.sendMessage(tab.id, {

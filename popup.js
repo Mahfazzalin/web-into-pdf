@@ -218,14 +218,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Selection PDF
   selectionPdfBtn.addEventListener('click', async () => {
+    if (!currentTab) return;
+    await ensureInjected(currentTab.id);
+
     const stats = await getTabMessage('getPageDetails');
     if (!stats || !stats.hasSelection) {
-      showToast('Please highlight/select text on the page first!', 'error');
+      showToast('Please highlight or select text on the webpage first!', 'error', 4000);
       return;
     }
+
+    const cleanTitle = (currentTab.title || 'Webpage').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 35);
     await runDirectPdf({
       readerMode: false,
-      selectionOnly: true
+      selectionOnly: true,
+      filename: `Selection_${cleanTitle}`
     });
   });
 
