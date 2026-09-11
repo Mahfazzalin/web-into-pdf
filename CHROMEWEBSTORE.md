@@ -221,7 +221,7 @@ If you have any questions or feedback regarding this privacy policy or the exten
 
 | Asset Type | Dimensions | Format | Status | Guidance & Notes |
 | :--- | :--- | :--- | :---: | :--- |
-| **Store Icon** [REQUIRED] | 128 × 128 px | PNG (32-bit with transparency) | 🟡 Needs Resize | Must be exactly 128×128 px. (Currently in `icons/icon128.png`). |
+| **Store Icon** [REQUIRED] | 128 × 128 px | PNG (32-bit with transparency) | ✅ Ready | Custom modern 3D squircle logo saved at `icons/icon128.png`. |
 | **Screenshot 1** [REQUIRED] | 1280 × 800 px (or 640 × 400 px) | PNG / JPEG | ⬜ Needs Capture | Main popup UI showing "Direct Clean PDF" & layout options. |
 | **Screenshot 2** [RECOMMENDED] | 1280 × 800 px | PNG / JPEG | ⬜ Needs Capture | "Clean Tab" featuring Element Eraser highlighting and removing ads. |
 | **Screenshot 3** [RECOMMENDED] | 1280 × 800 px | PNG / JPEG | ⬜ Needs Capture | "Convert Tab" showing Markdown, Plain Text & Table CSV export. |
